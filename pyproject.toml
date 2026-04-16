@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "seeka"
+version = "0.1.0"
+description = "Embedded Agent memory component"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "pyseekdb",
+    "sentence-transformers",
+    "chakpy",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+all = ["openai>=1.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["seeka*"]

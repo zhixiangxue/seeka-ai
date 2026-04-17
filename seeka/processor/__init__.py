@@ -1,4 +1,4 @@
 from .base import ProcessorBase
-from .agent import AgentProcessor
+from .agentic import AgenticProcessor
 
-__all__ = ["ProcessorBase", "AgentProcessor"]
+__all__ = ["ProcessorBase", "AgenticProcessor"]

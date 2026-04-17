@@ -1,36 +1,34 @@
-import uuid
+import os
+import warnings
 
-from .models import Memo
+from .archive import Archive
+from .notebook import Notebook
+from .models import Memo, Note
 from .storage.seekdb import SeekDB
-from .embedding.base import EmbeddingBase
-from .embedding.local import LocalEmbedding
-from .embedding.openai import OpenAIEmbedding
-from .rerank.base import RerankBase
-from .processor.base import ProcessorBase
-from .processor.agent import AgentProcessor
+from .embedding import create as create_embedding
+from .rerank import create as create_reranker
+from .processor.agentic import AgenticProcessor
 
 _DEFAULT_NAMESPACE = "default"
 
 
 class Memory:
     """
-    Public entry point for seeka. Assembles all components and exposes add / search / delete.
+    Public entry point for seeka.
 
-    Minimal usage (zero config):
-        from seeka import Memory
+    Minimal usage (zero config, local embedding):
         mem = Memory("./my.db")
-        mem.add("User prefers pour-over coffee")
-        results = mem.search("coffee preference")
+        await mem.note("User prefers pour-over coffee")
+        await mem.dream()
+        results = await mem.recall("coffee preference")
 
-    Full configuration:
+    Full configuration (chak URI format for model_uri):
         mem = Memory(
             "./my.db",
-            embedding_uri="https://api.openai.com/v1",
+            embedding_uri="openai/text-embedding-3-small",
             embedding_api_key="sk-...",
-            llm_uri="https://api.openai.com/v1",
+            llm_uri="openai/gpt-4o-mini",
             llm_api_key="sk-...",
-            rerank_uri="https://api.cohere.ai/v1",
-            rerank_api_key="...",
         )
     """
 
@@ -47,80 +45,104 @@ class Memory:
     ):
         self._namespace = namespace
         self._storage = SeekDB(path)
-        self._embedding = self._build_embedding(embedding_uri, embedding_api_key)
-        self._processor = self._build_processor(llm_uri, llm_api_key)
-        self._reranker = self._build_reranker(rerank_uri, rerank_api_key)
+        self._embedding = create_embedding(embedding_uri, embedding_api_key)
+        if llm_uri and not llm_api_key:
+            raise ValueError(
+                "llm_api_key is required when llm_uri is set"
+            )
+        self._processor = (
+            AgenticProcessor(model_uri=llm_uri, api_key=llm_api_key)
+            if llm_uri
+            else None
+        )
+        self._reranker = create_reranker(rerank_uri, rerank_api_key) if rerank_uri else None
+        db_path = self._derive_db_path(path)
+        self._notebook = Notebook(db_path)
+        self._archive = Archive(db_path)
 
     # ------------------------------------------------------------------
-    # Component factories
+    # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_embedding(self, uri: str, api_key: str) -> EmbeddingBase:
-        if uri and api_key:
-            return OpenAIEmbedding(api_key=api_key, base_url=uri)
-        return LocalEmbedding()
-
-    def _build_processor(self, uri: str, api_key: str):
-        if uri and api_key:
-            return AgentProcessor(llm_uri=uri, llm_api_key=api_key)
-        return None
-
-    def _build_reranker(self, uri: str, api_key: str):
-        # rerank_uri / rerank_api_key reserved for future remote rerank service integration
-        if uri or api_key:
-            # TODO: integrate remote rerank service
-            pass
-        return None
+    @staticmethod
+    def _derive_db_path(path: str) -> str:
+        base, _ = os.path.splitext(path)
+        return base + "_sqlite.db"
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def add(self, content: str, metadata: dict = None) -> str:
-        """
-        Store a memory entry and return the first generated id.
-        If a processor is configured, content is processed into one or more Memo objects;
-        each is stored independently. Without a processor, content is stored as a single Memo.
-        """
-        if self._processor:
-            memos = self._processor.process(content)
-        else:
-            memos = [Memo(content=content)]
+    async def note(self, content: str, metadata: dict = None) -> str:
+        """Record raw input as a Note. Fast, no network calls. Returns the Note id."""
+        n = Note(content=content, metadata=metadata or {}, namespace=self._namespace)
+        n = await self._notebook.add(n)
+        return n.id
 
-        first_id = None
-        for memo in memos:
-            fid = str(uuid.uuid4())
-            embedding = self._embedding.embed(memo.content)
-            self._storage.add(
-                id=fid,
-                content=memo.content,
-                embedding=embedding,
-                namespace=self._namespace,
-                metadata=metadata or {},
+    async def dream(self) -> list[Memo]:
+        """Process all pending Notes. Runs processor + embedding + storage writes."""
+        notes = await self._notebook.pendings(self._namespace)
+        if not notes:
+            return []
+
+        combined = "\n".join(note.content for note in notes)
+
+        try:
+            if self._processor:
+                raw_memos = await self._processor.process(combined)
+            else:
+                raw_memos = [Memo(content=note.content) for note in notes]
+
+            all_memos: list[Memo] = []
+            for memo in raw_memos:
+                memo.namespace = self._namespace
+                embedding = await self._embedding.embed(memo.content)
+                await self._storage.add(memo, embedding)
+                await self._archive.save(memo)
+                all_memos.append(memo)
+
+            for note in notes:
+                await self._notebook.done(note)
+
+            return all_memos
+
+        except Exception:
+            for note in notes:
+                await self._notebook.fail(note)
+            raise
+
+    async def recall(self, query: str, n: int = 5) -> list[Memo]:
+        """Semantic search over consolidated memories."""
+        if await self._notebook.pendings(self._namespace):
+            warnings.warn(
+                "Unprocessed notes exist. Call dream() before recall() to include them.",
+                stacklevel=2,
             )
-            if first_id is None:
-                first_id = fid
 
-        return first_id
-
-    def search(self, query: str, n: int = 5) -> list[dict]:
-        """
-        Semantic search; returns the top-n most relevant memory entries.
-        If a reranker is configured, results are re-ranked after the initial vector search.
-        """
-        embedding = self._embedding.embed(query)
-        results = self._storage.search(
-            embedding=embedding,
-            namespace=self._namespace,
-            n=n if not self._reranker else n * 3,
+        embedding = await self._embedding.embed(query)
+        results = await self._storage.search(
+            embedding,
+            self._namespace,
+            n if not self._reranker else n * 3,
         )
 
         if self._reranker and results:
             docs = [r.get("content", "") for r in results]
-            ranked_indices = self._reranker.rerank(query, docs)
+            ranked_indices = await self._reranker.rerank(query, docs)
             results = [results[i] for i in ranked_indices[:n]]
 
-        return results
+        return [
+            Memo(
+                id=r.get("id", ""),
+                content=r.get("content", ""),
+                metadata=r.get("metadata", {}),
+                namespace=self._namespace,
+            )
+            for r in results
+        ]
 
-    def delete(self, id: str) -> None:
-        self._storage.delete(id)
+    async def delete(self, id: str) -> None:
+        """Delete a Memo by id from both SeekDB and the archive."""
+        memo = Memo(id=id, content="")
+        await self._storage.delete(id, self._namespace)
+        await self._archive.delete(memo)

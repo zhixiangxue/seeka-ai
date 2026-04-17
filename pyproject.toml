@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "seeka"
@@ -14,11 +14,11 @@ dependencies = [
     "pyseekdb",
     "sentence-transformers",
     "chakpy",
+    "aiosqlite",
+    "openai>=1.0",
+    "cohere>=5.0",
+    "python-dotenv",
 ]
-
-[project.optional-dependencies]
-openai = ["openai>=1.0"]
-all = ["openai>=1.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]

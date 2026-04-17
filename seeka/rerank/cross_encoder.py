@@ -1,10 +1,12 @@
+import asyncio
+
 from .base import RerankBase
 
 
-class LocalRerank(RerankBase):
+class CrossEncoderRerank(RerankBase):
     """
-    Local rerank implementation using a cross-encoder.
-    Lazily loads cross-encoder/ms-marco-MiniLM-L-6-v2.
+    In-process rerank via sentence-transformers CrossEncoder.
+    Lazily loads cross-encoder/ms-marco-MiniLM-L-6-v2. Zero config, no external server.
     """
 
     MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -18,9 +20,8 @@ class LocalRerank(RerankBase):
             from sentence_transformers import CrossEncoder
             self._model = CrossEncoder(self._model_name)
 
-    def rerank(self, query: str, docs: list[str]) -> list[int]:
+    async def rerank(self, query: str, docs: list[str]) -> list[int]:
         self._load()
         pairs = [(query, doc) for doc in docs]
-        scores = self._model.predict(pairs)
-        ranked = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
-        return ranked
+        scores = await asyncio.to_thread(self._model.predict, pairs)
+        return sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)

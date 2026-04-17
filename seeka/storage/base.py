@@ -1,21 +1,17 @@
 from abc import ABC, abstractmethod
 
+from ..models import Memo
+
 
 class StorageBase(ABC):
 
     @abstractmethod
-    def add(
-        self,
-        id: str,
-        content: str,
-        embedding: list[float],
-        namespace: str,
-        metadata: dict,
-    ) -> None:
+    async def add(self, memo: Memo, embedding: list[float]) -> None:
+        """Persist a fully-populated Memo together with its embedding vector."""
         ...
 
     @abstractmethod
-    def search(
+    async def search(
         self,
         embedding: list[float],
         namespace: str,
@@ -24,5 +20,5 @@ class StorageBase(ABC):
         ...
 
     @abstractmethod
-    def delete(self, id: str) -> None:
+    async def delete(self, id: str, namespace: str) -> None:
         ...

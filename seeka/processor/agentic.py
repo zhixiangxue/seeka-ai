@@ -1,7 +1,6 @@
 import importlib.util
 import inspect
 import os
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -15,19 +14,10 @@ class _MemoList(BaseModel):
     memos: list[str]
 
 
-class AgentProcessor(ProcessorBase):
+class AgenticProcessor(ProcessorBase):
     """
     Agent-driven processor backed by chak.Conversation.
-
-    Loads skills from the skills/ directory and forwards them to a
-    chak Conversation. All chak-compatible tool types are supported:
-    - Plain Python functions (.py files)
-    - Plain Python objects (.py files)
-    - SkillBase subclass instances (.py files)
-    - ClaudeSkill packs (sub-directories containing SKILL.md)
-
-    Skills are discovered at init time and reused across process() calls.
-    A fresh Conversation is created per process() call (single-shot extraction).
+    model_uri follows chak URI format: 'provider/model' or 'provider@base_url:model'.
     """
 
     SYSTEM_PROMPT = (
@@ -37,33 +27,14 @@ class AgentProcessor(ProcessorBase):
         "Return a structured list of fragments."
     )
 
-    def __init__(self, llm_uri: str, llm_api_key: str, model: str = None):
-        """
-        Args:
-            llm_uri: Either a full base URL (e.g. 'https://api.openai.com/v1')
-                     or a chak model URI (e.g. 'openai/gpt-4o-mini').
-                     When a base URL is given, it is combined with model as
-                     'openai@{llm_uri}:{model}'.
-            llm_api_key: API key for the LLM provider.
-            model: Model name (e.g. 'gpt-4o-mini'). Only used when
-                   llm_uri is a raw base URL.
-        """
-        self._model_uri = self._resolve_model_uri(llm_uri, model)
-        self._api_key = llm_api_key
+    def __init__(self, model_uri: str, api_key: str):
+        self._model_uri = model_uri
+        self._api_key = api_key
         self._tools = self._load_skills()
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-
-    def _resolve_model_uri(self, llm_uri: str, model: Optional[str]) -> str:
-        """Convert seeka's llm_uri + model into a chak model URI."""
-        if "://" in llm_uri:
-            # Raw base URL → build chak full-format URI
-            model_name = model or "gpt-4o-mini"
-            return f"openai@{llm_uri}:{model_name}"
-        # Already a chak-style URI (e.g. 'openai/gpt-4o-mini')
-        return llm_uri
 
     def _load_skills(self) -> list:
         """
@@ -141,11 +112,12 @@ class AgentProcessor(ProcessorBase):
     # Public interface
     # ------------------------------------------------------------------
 
-    def process(self, content: str) -> list[Memo]:
+    async def process(self, content: str) -> list[Memo]:
         """
         Extract Memo objects from raw content via LLM + skills.
         Returns a list of Memo instances with only content filled in.
         """
+        import asyncio
         conv = self._make_conversation()
-        result = conv.send(content, returns=_MemoList)
+        result = await asyncio.to_thread(conv.send, content, _MemoList)
         return [Memo(content=text) for text in result.memos]

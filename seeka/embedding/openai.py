@@ -1,5 +1,3 @@
-from openai import AsyncOpenAI
-
 from .base import EmbeddingBase
 from ..utils.uri import parse as parse_uri
 
@@ -13,6 +11,7 @@ class OpenAIEmbedding(EmbeddingBase):
     DEFAULT_MODEL = "text-embedding-3-small"
 
     def __init__(self, model_uri: str, api_key: str):
+        from openai import AsyncOpenAI
         parsed = parse_uri(model_uri)
         self._client = AsyncOpenAI(api_key=api_key, base_url=parsed.get("base_url"))
         self._model = parsed.get("model") or self.DEFAULT_MODEL

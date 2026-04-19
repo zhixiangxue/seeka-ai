@@ -18,6 +18,7 @@ dependencies = [
     "openai>=1.0",
     "cohere>=5.0",
     "python-dotenv",
+    "nanoid",
 ]
 
 [tool.setuptools.packages.find]

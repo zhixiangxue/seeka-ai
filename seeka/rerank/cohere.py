@@ -1,5 +1,3 @@
-import cohere
-
 from .base import RerankBase
 from ..utils.uri import parse as parse_uri
 
@@ -13,6 +11,7 @@ class CohereRerank(RerankBase):
     DEFAULT_MODEL = "rerank-v3.5"
 
     def __init__(self, model_uri: str, api_key: str):
+        import cohere
         parsed = parse_uri(model_uri)
         self._model = parsed.get("model") or self.DEFAULT_MODEL
         base_url = parsed.get("base_url")

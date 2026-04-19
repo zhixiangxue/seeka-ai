@@ -23,3 +23,12 @@ class SentenceTransformerEmbedding(EmbeddingBase):
         self._load()
         vec = await asyncio.to_thread(self._model.encode, text)
         return vec.tolist()
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Native batch encoding — more efficient than concurrent single embeds."""
+        if not texts:
+            return []
+        self._load()
+        def _encode():
+            return self._model.encode(texts).tolist()
+        return await asyncio.to_thread(_encode)

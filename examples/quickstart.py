@@ -2,9 +2,9 @@
 Seeka Quickstart
 
 Demonstrates the core memory loop:
-  note()   – record raw input (fast, no LLM call)
-  dream()  – refine pending notes into structured Memos (LLM + embedding)
-  recall() – semantic search over consolidated memories
+  note()    record raw input (fast, no LLM call)
+  dream()   refine pending notes into structured Memos (LLM + embedding)
+  recall()  semantic search over consolidated memories
 
 Setup:
   pip install seeka-ai

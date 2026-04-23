@@ -6,9 +6,11 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/seeka)](https://pypi.org/project/seeka/)
 [![License](https://img.shields.io/github/license/zhixiangxue/seeka-ai)](LICENSE)
 
-**A simple, embedded memory component for AI Agents.**
+**Embedded. Extensible. No infrastructure.**
 
-seeka turns raw conversation notes into a searchable, self-healing memory store — in three method calls.
+seeka is an embedded memory component for AI Agents — like SQLite, it runs inside your process with no server, no setup, and no external dependencies. Drop it into any Agent in minutes.
+
+Memory quality is not hardcoded. seeka's **Skills** system lets you define exactly how raw input is interpreted and extracted — for any domain, any use case — without touching the core pipeline.
 
 </div>
 
@@ -16,7 +18,7 @@ seeka turns raw conversation notes into a searchable, self-healing memory store 
 
 ## Core Features
 
-### 🌱 Minimalist API
+### Minimalist API
 
 No pipelines, no schemas, no boilerplate:
 
@@ -36,7 +38,7 @@ memos = await mem.remember("User prefers dark roast coffee and dislikes anything
 
 `note()` is instant — no network call, just persists raw text. `dream()` does the heavy lifting asynchronously when you're ready. `remember()` combines both into a single call for simple use cases. `recall()` is a semantic vector search over everything that's been dreamed.
 
-### 🌻 Automatic Conflict Resolution
+### Automatic Conflict Resolution
 
 When new memories contradict existing ones, seeka detects and removes the outdated entries automatically during `dream()`. No manual bookkeeping required.
 
@@ -52,9 +54,9 @@ results = await mem.recall("coffee")
 # Returns only the new "stopped drinking coffee" memo
 ```
 
-### 🪴 Custom Extraction Skills — Tailor Memory to Your Domain
+### Extraction Skills — Memory Quality You Control
 
-Skills let you control exactly how `dream()` interprets and extracts memories. seeka ships two built-in skills, and you can write your own for any domain.
+Memory quality is determined by Skills, not by a fixed pipeline baked into the library. Skills are plain Markdown files that live in your project. seeka ships two built-in skills; you can write your own for any domain, any output format, any extraction rule.
 
 **Built-in skills:**
 
@@ -101,7 +103,7 @@ mem = Memory("./my_memory", ..., skills=["./skills/meeting_notes"])
 
 The LLM sees only the skill's `name` and `description` initially. The full body is only revealed after the LLM decides to activate the skill — preventing token waste on irrelevant domains.
 
-### 🌒 Semantic Recall + Reranking
+### Semantic Recall + Reranking
 
 `recall()` embeds the query and returns the closest Memos by vector similarity. Optionally boost precision with a reranker:
 
@@ -121,7 +123,7 @@ mem = Memory("./my_memory", ...,
 results = await mem.recall("preference", filter={"user_id": {"$eq": "u42"}})
 ```
 
-### 🌓 Namespace Isolation
+### Namespace Isolation
 
 Separate memory spaces for different users, sessions, or agents — all in the same directory:
 
@@ -146,12 +148,33 @@ await alice.recall("food preference")  # returns only Alice's memo
 pip install seeka
 ```
 
-### Minimal example
+### Zero-config example (no API keys required)
 
 ```python
 import asyncio
 from seeka import Memory
 
+# No API keys — uses local SentenceTransformer for embedding
+mem = Memory("./my_memory")
+
+async def main():
+    await mem.note("I love pour-over coffee in the morning.")
+    await mem.note("I started learning guitar two weeks ago.")
+
+    memos = await mem.dream()
+    for m in memos:
+        print(m.content)
+
+    results = await mem.recall("coffee")
+    for r in results:
+        print(r.content)
+
+asyncio.run(main())
+```
+
+### With LLM (structured extraction + conflict resolution)
+
+```python
 mem = Memory(
     "./my_memory",
     embedding_uri="openai/text-embedding-3-small",
@@ -159,26 +182,13 @@ mem = Memory(
     llm_uri="openai/gpt-4o-mini",
     llm_api_key="sk-...",
 )
-
-async def main():
-    await mem.note("I started learning guitar two weeks ago. Goal: a full song in 3 months.")
-    await mem.note("I care about value for money — no brand premiums, but quality matters.")
-
-    memos = await mem.dream()
-    for m in memos:
-        print(m.content)
-
-    results = await mem.recall("music hobby")
-    for r in results:
-        print(r.content)
-
-asyncio.run(main())
 ```
 
 See the [`examples/`](examples/) directory for runnable demos:
 
 | File | Covers |
 |------|--------|
+| [`minimal.py`](examples/minimal.py) | Zero config, no API keys, local embedding only |
 | [`quickstart.py`](examples/quickstart.py) | `note → dream → recall → memos` — the core loop |
 | [`conflict_resolution.py`](examples/conflict_resolution.py) | Automatic conflict detection and removal |
 | [`extraction_skills.py`](examples/extraction_skills.py) | Built-in skills + writing a custom skill |
@@ -326,8 +336,29 @@ See [`examples/extraction_skills.py`](examples/extraction_skills.py) for a compl
 
 ---
 
-## Acknowledgements
+## Storage Backends
 
-seeka's vector storage is powered by **[seekdb](https://github.com/oceanbase/seekdb)** — a high-performance, embedded vector database built on OceanBase. seekdb provides the persistent vector index and metadata filtering that makes `recall()` fast and reliable without requiring an external database server.
+seeka supports two embedded vector store backends. Both run inside your process — no server required.
+
+| Backend | Default | Platform | Notes |
+|---------|---------|----------|-------|
+| [lancedb](https://github.com/lancedb/lancedb) | yes | Windows / macOS / Linux | Recommended for all platforms |
+| [seekdb](https://github.com/oceanbase/seekdb) | no | Linux only | High-performance OceanBase-based store; **not supported on Windows** |
+
+The default is **lancedb**. To use seekdb, instantiate `SeekDB` directly from `seeka.storage`.
+
+## Is seeka right for you?
+
+seeka is a good fit if any of these sound like you:
+
+- You don't want to run or maintain a memory service — seeka is a library, not a server.
+- You want to customize what gets stored without touching any pipeline code — drop in a Skill and you're done.
+- You need per-user or per-agent memory isolation with zero database setup.
+- You want memory that self-heals — conflicting facts are resolved automatically, no bookkeeping required.
+- You need to ship something in an afternoon, not a sprint.
+
+seeka is not a good fit if you need to index large document collections (RAG), run complex structured queries, or handle bulk-write throughput at scale.
+
+---
 
 <div align="right"><img src="https://raw.githubusercontent.com/zhixiangxue/seeka-ai/main/docs/assets/logo.png" alt="seeka" width="120"></div>

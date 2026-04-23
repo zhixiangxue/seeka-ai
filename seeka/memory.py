@@ -7,7 +7,7 @@ import warnings
 from .archive import Archive
 from .notebook import Notebook
 from .models import Memo, Note
-from .storage.seekdb import SeekDB
+from .storage.lancedb import LanceDB
 from .embedding import create as create_embedding
 from .rerank import create as create_reranker
 from .processor.agentic import AgenticProcessor
@@ -27,8 +27,8 @@ class Memory:
         results = await mem.recall("coffee preference")
 
     All storage files are placed inside the given directory:
-        <path>/          – vector store (pyseekdb)
-        <path>/seeka.db  – SQLite archive & notebook
+        <path>/           vector store (lancedb)
+        <path>/seeka.db   SQLite archive & notebook
 
     Full configuration (chak URI format for model_uri):
         mem = Memory(
@@ -55,7 +55,7 @@ class Memory:
         path = os.path.abspath(path)
         os.makedirs(path, exist_ok=True)
         self._namespace = namespace
-        self._storage = SeekDB(path, namespace)
+        self._storage = LanceDB(path, namespace)
         self._embedding = create_embedding(embedding_uri, embedding_api_key)
         if llm_uri and not llm_api_key:
             raise ValueError(
@@ -189,7 +189,7 @@ class Memory:
         ]
 
     async def delete(self, id: str) -> None:
-        """Delete a Memo by id from both SeekDB and the archive."""
+        """Delete a Memo by id from both VectorDB and the archive."""
         await self._storage.delete(id)
         await self._archive.delete(id)
 

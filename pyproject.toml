@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seeka"
-version = "0.1.0"
+version = "0.2.0"
 description = "Embedded Agent memory component"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,7 +12,6 @@ license = { text = "MIT" }
 
 dependencies = [
     "lancedb",
-    "sentence-transformers",
     "chakpy",
     "aiosqlite",
     "openai>=1.0",
@@ -20,6 +19,12 @@ dependencies = [
     "python-dotenv",
     "nanoid",
 ]
+
+[project.optional-dependencies]
+# Local embedding/rerank via sentence-transformers (pulls torch + transformers,
+# adds ~5 GB to the install). Only needed if you want offline / on-prem
+# inference; cloud providers (openai / bailian / cohere) are the default path.
+local-embed = ["sentence-transformers>=2.2"]
 
 [tool.setuptools.packages.find]
 where = ["."]

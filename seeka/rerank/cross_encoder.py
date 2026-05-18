@@ -17,7 +17,16 @@ class CrossEncoderRerank(RerankBase):
 
     def _load(self):
         if self._model is None:
-            from sentence_transformers import CrossEncoder
+            try:
+                from sentence_transformers import CrossEncoder
+            except ImportError as e:
+                raise ImportError(
+                    "Local cross-encoder rerank requires the optional "
+                    "`sentence-transformers` dependency. Install it with:\n"
+                    "    pip install 'seeka[local-embed]'\n"
+                    "(adds ~5 GB; or use a cloud reranker via `rerank_uri`, "
+                    "e.g. 'cohere/rerank-english-v3.0' or 'bailian/gte-rerank')."
+                ) from e
             self._model = CrossEncoder(self._model_name)
 
     async def rerank(self, query: str, docs: list[str]) -> list[int]:

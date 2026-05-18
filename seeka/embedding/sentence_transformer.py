@@ -16,7 +16,16 @@ class SentenceTransformerEmbedding(EmbeddingBase):
 
     def _load(self):
         if self._model is None:
-            from sentence_transformers import SentenceTransformer
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as e:
+                raise ImportError(
+                    "Local embedding requires the optional `sentence-transformers` "
+                    "dependency. Install it with:\n"
+                    "    pip install 'seeka[local-embed]'\n"
+                    "(adds ~5 GB; or use a cloud provider via `embedding_uri`, "
+                    "e.g. 'openai/text-embedding-3-small' or 'bailian/text-embedding-v3')."
+                ) from e
             self._model = SentenceTransformer(self.MODEL_NAME)
 
     async def embed(self, text: str) -> list[float]:

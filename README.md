@@ -145,10 +145,19 @@ await alice.recall("food preference")  # returns only Alice's memo
 ### Installation
 
 ```bash
+# Default install — cloud embeddings (OpenAI / Bailian / any OpenAI-compatible)
 pip install seeka
+
+# Optional: local embedding & rerank via sentence-transformers (~5 GB,
+# pulls torch + transformers; only needed for offline / on-prem usage)
+pip install "seeka[local-embed]"
 ```
 
+By default seeka has **no heavy ML dependencies** — vector embeddings go through cloud providers via `embedding_uri`. Install the `local-embed` extra only if you actually want to run sentence-transformers / cross-encoder locally.
+
 ### Zero-config example (no API keys required)
+
+> Requires the optional local backend: `pip install "seeka[local-embed]"`.
 
 ```python
 import asyncio
@@ -246,8 +255,8 @@ The atomic unit of memory returned by `dream()`, `recall()`, and `memos()`.
 
 | URI | Provider | Notes |
 |-----|----------|-------|
-| *(none)* | `sentence-transformers` | Local, zero config, no API key needed |
-| `local/model-name` | `sentence-transformers` | Specify a custom local model |
+| *(none)* | `sentence-transformers` | Local, zero config; requires `pip install "seeka[local-embed]"` |
+| `local/model-name` | `sentence-transformers` | Specify a custom local model; requires `seeka[local-embed]` |
 | `openai/text-embedding-3-small` | OpenAI | Any OpenAI embedding model |
 | `bailian/text-embedding-v3` | Alibaba Bailian | Native batch API |
 | `provider@https://base-url/model` | Any OpenAI-compatible | Custom endpoint |
@@ -286,7 +295,7 @@ Optional, improves `recall()` precision by re-scoring candidates with a cross-en
 | URI | Provider | Notes |
 |-----|----------|-------|
 | *(none)* | — | Disabled; pure vector search |
-| `cross-encoder/ms-marco-MiniLM-L-6-v2` | Local cross-encoder | Zero config, no API key |
+| `cross-encoder/ms-marco-MiniLM-L-6-v2` | Local cross-encoder | Zero config; requires `pip install "seeka[local-embed]"` |
 | `cohere/rerank-english-v3.0` | Cohere | `rerank_api_key` required |
 | `bailian/gte-rerank` | Alibaba Bailian | `rerank_api_key` required |
 

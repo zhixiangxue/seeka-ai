@@ -214,6 +214,7 @@ All storage is placed inside `path/` — vector store files and a `seeka.db` SQL
 |-----------|------|---------|-------------|
 | `path` | `str` | required | Directory for all storage files |
 | `namespace` | `str` | `"default"` | Logical memory partition |
+| `storage` | `StorageBackend` | `StorageBackend.LANCEDB` | Vector database backend (see [Storage Backends](#storage-backends)) |
 | `embedding_uri` | `str` | `None` | Embedding model URI (see [Embedding Providers](#embedding-providers)) |
 | `embedding_api_key` | `str` | `None` | API key for cloud embedding |
 | `llm_uri` | `str` | `None` | LLM URI for `dream()` and conflict resolution |
@@ -347,14 +348,28 @@ See [`examples/extraction_skills.py`](examples/extraction_skills.py) for a compl
 
 ## Storage Backends
 
-seeka supports two embedded vector store backends. Both run inside your process — no server required.
+seeka supports three embedded vector store backends — all run inside your process, no server required. Select one via the `StorageBackend` enum:
 
-| Backend | Default | Platform | Notes |
-|---------|---------|----------|-------|
-| [lancedb](https://github.com/lancedb/lancedb) | yes | Windows / macOS / Linux | Recommended for all platforms |
-| [seekdb](https://github.com/oceanbase/seekdb) | no | Linux only | High-performance OceanBase-based store; **not supported on Windows** |
+```python
+from seeka import Memory, StorageBackend
 
-The default is **lancedb**. To use seekdb, instantiate `SeekDB` directly from `seeka.storage`.
+# LanceDB — all platforms (default)
+mem = Memory("./data", storage=StorageBackend.LANCEDB)
+
+# zvec — Linux, macOS ARM64, Windows x86_64
+mem = Memory("./data", storage=StorageBackend.ZVEC)
+
+# SeekDB — Linux only
+mem = Memory("./data", storage=StorageBackend.SEEKDB)
+```
+
+If a backend is unavailable on the current platform (e.g. SeekDB on Windows), a clear `RuntimeError` is raised at construction time rather than a cryptic import failure.
+
+| Backend | Linux | macOS ARM64 | Windows | Notes |
+|---------|:---:|:---:|:---:|-------|
+| [LanceDB](https://github.com/lancedb/lancedb) | ✅ | ✅ | ✅ | Default. Zero-config, all platforms. |
+| [zvec](https://github.com/alibaba/zvec) | ✅ | ✅ | ✅ | Alibaba's in-process DB; GIL-free C++ core, asyncio-safe. |
+| [SeekDB](https://github.com/oceanbase/seekdb) | ✅ | ❌ | ❌ | OceanBase-backed; high-performance on Linux only. |
 
 ## Is seeka right for you?
 

@@ -2,18 +2,39 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 import warnings
+from enum import Enum
 
 from .archive import Archive
 from .notebook import Notebook
 from .models import Memo, Note
-from .storage.lancedb import LanceDB
+from .storage import LanceDB, SeekDB, ZvecDB
 from .embedding import create as create_embedding
 from .rerank import create as create_reranker
 from .processor.agentic import AgenticProcessor
 from .processor.conflict import ConflictResolver
 
 _DEFAULT_NAMESPACE = "default"
+
+
+class StorageBackend(str, Enum):
+    """Supported vector storage backends.
+
+    Usage:
+        from seeka import Memory, StorageBackend
+        mem = Memory("./data", storage=StorageBackend.ZVEC)
+    """
+    LANCEDB = "lancedb"
+    SEEKDB = "seekdb"
+    ZVEC = "zvec"
+
+
+_backend_registry: dict[StorageBackend, type] = {
+    StorageBackend.LANCEDB: LanceDB,
+    StorageBackend.SEEKDB: SeekDB,
+    StorageBackend.ZVEC: ZvecDB,
+}
 
 
 class Memory:
@@ -27,8 +48,15 @@ class Memory:
         results = await mem.recall("coffee preference")
 
     All storage files are placed inside the given directory:
-        <path>/           vector store (lancedb)
+        <path>/           vector store (lancedb / seekdb / zvec)
         <path>/seeka.db   SQLite archive & notebook
+
+    Choose a vector backend via the StorageBackend enum:
+        from seeka import Memory, StorageBackend
+
+        mem = Memory("./my_memory", storage=StorageBackend.ZVEC)
+        mem = Memory("./my_memory", storage=StorageBackend.SEEKDB)
+        mem = Memory("./my_memory", storage=StorageBackend.LANCEDB)   # default
 
     Full configuration (chak URI format for model_uri):
         mem = Memory(
@@ -44,6 +72,7 @@ class Memory:
         self,
         path: str,
         namespace: str = _DEFAULT_NAMESPACE,
+        storage: StorageBackend = StorageBackend.LANCEDB,
         embedding_uri: str = None,
         embedding_api_key: str = None,
         llm_uri: str = None,
@@ -55,7 +84,23 @@ class Memory:
         path = os.path.abspath(path)
         os.makedirs(path, exist_ok=True)
         self._namespace = namespace
-        self._storage = LanceDB(path, namespace)
+
+        backend_cls = _backend_registry.get(storage)
+        if backend_cls is None:
+            valid = [b.value for b in StorageBackend]
+            raise ValueError(
+                f"Unknown storage backend: {storage!r}. "
+                f"Available: {valid}"
+            )
+        try:
+            self._storage = backend_cls(path, namespace)
+        except ImportError as e:
+            raise RuntimeError(
+                f"Storage backend '{storage.value}' is not available on this "
+                f"platform ({sys.platform}). The required native library may "
+                f"not be installed or may not support your system.\n"
+                f"Error: {e}"
+            ) from e
         self._embedding = create_embedding(embedding_uri, embedding_api_key)
         if llm_uri and not llm_api_key:
             raise ValueError(
@@ -198,11 +243,9 @@ class Memory:
         return await self._archive.get(id)
 
     async def update(self, id: str, content: str, metadata: dict = None) -> Memo:
-        """
-        Update an existing Memo's content (and optionally metadata).
-        Re-embeds the new content and writes both SeekDB and archive.
-        Raises KeyError if the Memo does not exist.
-        """
+        """Update an existing Memo's content (and optionally metadata).
+        Re-embeds the new content and writes both vector store and archive.
+        Raises KeyError if the Memo does not exist."""
         existing = await self._archive.get(id)
         if existing is None:
             raise KeyError(f"Memo {id!r} not found")

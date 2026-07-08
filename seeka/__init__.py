@@ -1,6 +1,6 @@
 from importlib.metadata import version, PackageNotFoundError
 
-from .memory import Memory
+from .memory import Memory, StorageBackend
 from .models import Memo
 from . import skills
 
@@ -9,4 +9,4 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0.dev"
 
-__all__ = ["Memory", "Memo", "skills", "__version__"]
+__all__ = ["Memory", "StorageBackend", "Memo", "skills", "__version__"]

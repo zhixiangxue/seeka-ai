@@ -18,7 +18,6 @@ dependencies = [
     "cohere>=5.0",
     "python-dotenv",
     "nanoid",
-    "zvec>=0.5.1",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +25,13 @@ dependencies = [
 # adds ~5 GB to the install). Only needed if you want offline / on-prem
 # inference; cloud providers (openai / bailian / cohere) are the default path.
 local-embed = ["sentence-transformers>=2.2"]
+
+# Alternative vector database backends — install one per deployment.
+# LanceDB (included by default) works on all platforms. Use these extras
+# if you need zvec or SeekDB.  Each backend is lazy-imported; installing
+# on an unsupported platform will give a clear error at runtime.
+zvec = ["zvec>=0.5.1"]
+seekdb = ["pyseekdb"]
 
 [tool.setuptools.packages.find]
 where = ["."]

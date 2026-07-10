@@ -9,7 +9,6 @@ from enum import Enum
 from .archive import Archive
 from .notebook import Notebook
 from .models import Memo, Note
-from .storage import LanceDB, SeekDB, ZvecDB
 from .embedding import create as create_embedding
 from .rerank import create as create_reranker
 from .processor.agentic import AgenticProcessor
@@ -29,12 +28,15 @@ class StorageBackend(str, Enum):
     SEEKDB = "seekdb"
     ZVEC = "zvec"
 
-
-_backend_registry: dict[StorageBackend, type] = {
-    StorageBackend.LANCEDB: LanceDB,
-    StorageBackend.SEEKDB: SeekDB,
-    StorageBackend.ZVEC: ZvecDB,
-}
+    @property
+    def cls(self):
+        """Return the StorageBase implementation class for this backend."""
+        from .storage import LanceDB, SeekDB, ZvecDB
+        return {
+            StorageBackend.LANCEDB: LanceDB,
+            StorageBackend.SEEKDB: SeekDB,
+            StorageBackend.ZVEC: ZvecDB,
+        }[self]
 
 
 class Memory:
@@ -85,20 +87,18 @@ class Memory:
         os.makedirs(path, exist_ok=True)
         self._namespace = namespace
 
-        backend_cls = _backend_registry.get(storage)
-        if backend_cls is None:
-            valid = [b.value for b in StorageBackend]
-            raise ValueError(
-                f"Unknown storage backend: {storage!r}. "
-                f"Available: {valid}"
-            )
         try:
-            self._storage = backend_cls(path, namespace)
+            self._storage = storage.cls(path, namespace)
         except ImportError as e:
+            # LanceDB is always available (core dependency).
+            # For zvec / seekdb the enum value doubles as the pip extra name.
+            hint = ""
+            if storage is not StorageBackend.LANCEDB:
+                hint = f"\nInstall it with: pip install 'seeka[{storage.value}]'"
             raise RuntimeError(
-                f"Storage backend '{storage.value}' is not available on this "
-                f"platform ({sys.platform}). The required native library may "
-                f"not be installed or may not support your system.\n"
+                f"Storage backend '{storage.value}' is not available — "
+                f"the required package is not installed or not supported "
+                f"on this platform ({sys.platform}).{hint}\n"
                 f"Error: {e}"
             ) from e
         self._embedding = create_embedding(embedding_uri, embedding_api_key)

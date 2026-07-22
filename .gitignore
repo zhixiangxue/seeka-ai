@@ -209,3 +209,8 @@ __marimo__/
 .qoder/
 playground/
 .venv*
+.seeka/
+
+# NeuG glog output
+/neug.*
+tmp/

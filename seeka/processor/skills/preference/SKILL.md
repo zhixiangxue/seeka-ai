@@ -38,3 +38,29 @@ A preference signal is something that reveals the user's **attitude, taste, or v
 ## Output
 
 Return one preference statement per item. Each statement should be self-contained and retrievable by semantic search on topics like "用户对咖啡的态度" or "用户的购物偏好".
+
+## Graph Extraction
+
+Extract a preference-focused knowledge graph. Only extract entities and relationships that reveal user **attitudes, tastes, or value judgments**.
+
+### Entity Types
+Focus on these preference-relevant types:
+- **person** — the user or people whose preferences are discussed
+- **product** — specific items (brands, models)
+- **category** — product/service categories (coffee, fabric, cuisine)
+- **brand** — company or brand names
+- **attribute** — qualities the user cares about (sweetness, quietness, cost)
+
+### Predicates (Relationship Verbs)
+Use attitude-revealing verbs:
+- prefers, dislikes, avoids, values, prioritizes
+- chooses_over (subject prefers over object)
+- tolerates, indifferent_to
+- associated_with (brand→attribute or category→attribute)
+
+### Rules
+- Entity `id` must be a short, lowercase, hyphen-separated slug
+- Only extract entities that participate in at least one preference-related triple
+- Do NOT create triples for neutral facts (e.g. "bought X" without attitude)
+- Implicit preferences: only extract when behavioral evidence is strong
+- If user prefers A over B, create: `user --chooses_over--> B` AND `user --prefers--> A`

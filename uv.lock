@@ -2824,7 +2824,7 @@ wheels = [
 
 [[package]]
 name = "seeka"
-version = "0.2.0"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
@@ -2835,12 +2835,14 @@ dependencies = [
     { name = "nanoid" },
     { name = "openai" },
     { name = "python-dotenv" },
-    { name = "zvec" },
 ]
 
 [package.optional-dependencies]
 local-embed = [
     { name = "sentence-transformers" },
+]
+zvec = [
+    { name = "zvec" },
 ]
 
 [package.metadata]
@@ -2853,9 +2855,9 @@ requires-dist = [
     { name = "openai", specifier = ">=1.0" },
     { name = "python-dotenv" },
     { name = "sentence-transformers", marker = "extra == 'local-embed'", specifier = ">=2.2" },
-    { name = "zvec", specifier = ">=0.5.1" },
+    { name = "zvec", marker = "extra == 'zvec'", specifier = ">=0.5.1" },
 ]
-provides-extras = ["local-embed"]
+provides-extras = ["local-embed", "zvec"]
 
 [[package]]
 name = "sentence-transformers"

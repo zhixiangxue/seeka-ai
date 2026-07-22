@@ -1,14 +1,19 @@
 from abc import ABC, abstractmethod
 
-from ..models import Memo
+from ..models import Memo, Entity, Triple
 
 
 class ProcessorBase(ABC):
 
     @abstractmethod
-    async def process(self, content: str) -> list[Memo]:
+    async def process(self, content: str) -> tuple[list[Memo], list[Entity], list[Triple]]:
         """
-        Accept raw content and return a list of Memo objects to be stored.
-        Only the content field needs to be filled; id and namespace are assigned later.
+        Accept raw content and return extracted memories + graph data.
+
+        Returns:
+            A tuple of (memos, entities, triples).
+            - memos: list of Memo objects (only content filled; id/namespace assigned later)
+            - entities: list of Entity objects for the knowledge graph (may be empty)
+            - triples: list of Triple objects (directed edges) for the graph (may be empty)
         """
         ...

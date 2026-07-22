@@ -35,3 +35,33 @@ Convert all relative time expressions to absolute dates when possible.
 
 ## 6. Output
 Return each memory as a concise, self-contained statement that is independently understandable without additional context.
+
+## Graph Extraction
+
+In addition to memory statements, extract a knowledge graph from the input.
+
+### Entity Types
+Extract entities of these types (not limited to):
+- **person** — people mentioned by name or role
+- **place** — locations, cities, stores, venues
+- **activity** — hobbies, exercises, routines
+- **thing** — objects, products, foods, drinks
+- **concept** — ideas, topics, skills being learned
+- **event** — named events, trips, meetings
+- **organization** — companies, teams, groups
+
+### Predicates (Relationship Verbs)
+Use natural-language verb phrases. Common examples:
+- Person→Thing: drinks, eats, owns, bought, uses
+- Person→Activity: practices, enjoys, started, quit
+- Person→Person: knows, works_with, lives_with, met
+- Person→Place: lives_in, visited, works_at
+- Thing→Thing: contains, part_of, alternative_to
+- Activity→Concept: improves, requires, related_to
+
+### Rules
+- Entity `id` must be a short, lowercase, hyphen-separated slug (e.g. `pour-over-coffee`)
+- Only extract entities that participate in at least one triple
+- Predicates should be concise (1-3 words), lowercase, underscore-separated
+- Do NOT extract vague time expressions or pure adjectives as entities
+- Resolve pronouns before creating entities — use the resolved name

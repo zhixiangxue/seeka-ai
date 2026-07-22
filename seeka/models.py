@@ -39,10 +39,40 @@ class Memo(BaseModel):
         return _parse_metadata(v)
 
 
+class Entity(BaseModel):
+    """A node in the knowledge graph."""
+
+    id: str = Field(default_factory=nanoid)
+    name: str = Field(description="Display name of the entity")
+    type: str = Field(description="Entity category (e.g. person, product, symptom)")
+    description: str = Field(default="", description="One-line description")
+    aliases: str = Field(default="", description="Comma-separated alternative names")
+    namespace: str = Field(default="")
+    created_at: int = Field(default_factory=lambda: int(time.time()))
+
+
+class Triple(BaseModel):
+    """A directed edge in the knowledge graph.
+
+    Represents: subject --predicate--> object
+    Example: Entity('xiaoming') --drinks--> Entity('pour-over-coffee')
+    """
+
+    subject_id: str = Field(description="Source entity id")
+    predicate: str = Field(description="Relation verb (e.g. experiences, takes, prefers)")
+    object_id: str = Field(description="Target entity id")
+    description: str = Field(default="", description="Human-readable edge description")
+    source_memo_id: str = Field(default="", description="The memo that produced this triple")
+    valid_from: int = Field(default_factory=lambda: int(time.time()))
+    valid_to: int = Field(default=0, description="0 means currently valid (sentinel for NULL)")
+    created_at: int = Field(default_factory=lambda: int(time.time()))
+
+
 class Note(BaseModel):
     """A raw input record written by the developer, pending processing into Memos."""
 
     id: str = Field(default_factory=nanoid, description="nanoid auto-generated at creation")
+    key: str | None = Field(default=None, description="Optional semantic key for LLM-addressable CRUD")
     content: str = Field(description="Raw input content")
     metadata: dict = Field(default_factory=dict, description="User-provided metadata")
     namespace: str = Field(default="", description="Memory namespace")

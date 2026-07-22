@@ -1,18 +1,11 @@
-"""
-Seeka Quickstart — compare all three storage backends.
+"""Seeka Quickstart — three-layer memory in one example.
 
-Runs the core memory loop (note → dream → recall) against every
-StorageBackend.  Backends that are unsupported on the current platform
-are skipped with a clear message rather than crashing.
-
-On Windows you should see:
-  · LANCEDB  — ✅ works
-  · ZVEC     — ✅ works
-  · SEEKDB   — ⚠️ skipped (pyseekdb unavailable on win32)
+Demonstrates the full memory loop: note → dream → recall
+with vector DB + graph DB working together.
 
 Setup:
   pip install seeka-ai
-  export BAILIAN_API_KEY=sk-...   # or OPENAI_API_KEY for OpenAI models
+  export BAILIAN_API_KEY=sk-...
 
 Run:
   python examples/quickstart.py
@@ -22,12 +15,12 @@ import asyncio
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from seeka import Memory, StorageBackend
+from seeka import Memory, VectorDB, GraphDB
 
 load_dotenv()
 api_key = os.environ["BAILIAN_API_KEY"]
 
-BASE_DIR = Path.home() / "seeka-data" / "quickstart"
+DATA_DIR = Path(__file__).resolve().parent.parent / "tmp" / "quickstart"
 
 SAMPLE_NOTES = [
     "I don't like milk tea, it's too sweet. I love pour-over coffee, especially in the morning.",
@@ -36,75 +29,47 @@ SAMPLE_NOTES = [
 ]
 
 
-def build_memory(backend: StorageBackend) -> Memory:
-    """Construct a Memory instance for the given storage backend."""
-    data_dir = BASE_DIR / backend.value
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return Memory(
-        str(data_dir),
-        storage=backend,
+async def main():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    mem = Memory(
+        str(DATA_DIR),
+        vector_db=VectorDB.LANCEDB,
+        graph_db=GraphDB.NEUG,
         embedding_uri="bailian/text-embedding-v3",
         embedding_api_key=api_key,
         llm_uri="bailian/qwen-plus",
         llm_api_key=api_key,
     )
+    await mem.forget()
 
+    # 1. note — write raw input
+    for text in SAMPLE_NOTES:
+        await mem.note(text)
+    print(f"[note]  {len(SAMPLE_NOTES)} notes recorded")
 
-async def run_backend(backend: StorageBackend) -> None:
-    print(f"\n{'─' * 58}")
-    print(f"  Storage: {backend.name:<10}  (backend = '{backend.value}')")
-    print(f"{'─' * 58}")
+    # 2. dream — extract memos (vector) + entities/triples (graph)
+    memos = await mem.dream()
+    print(f"[dream] {len(memos)} memos extracted")
+    for m in memos:
+        print(f"        · {m.content}")
 
-    # ── construct Memory (may fail on unsupported platforms) ────────
-    try:
-        mem = build_memory(backend)
-    except RuntimeError as e:
-        print(f"  ⚠️  SKIPPED — {e}")
-        return
+    # 3. check graph
+    catalog = await mem._graph.get_entity_catalog()
+    predicates = await mem._graph.get_predicate_catalog()
+    print(f"[graph] {len(catalog)} entities, {len(predicates)} predicates")
+    for e in catalog[:5]:
+        print(f"        · {e['name']} ({e['type']})")
 
-    try:
-        await mem.forget()
+    # 4. recall — multi-path: vector similarity + graph text2statement
+    results = await mem.recall("coffee preference", n=3)
+    print(f"[recall] 'coffee preference' → {len(results)} results")
+    for r in results:
+        src = r.metadata.get("source", "vector")
+        print(f"        [{src}] {r.content[:80]}")
 
-        # ── 1. note() ───────────────────────────────────────────────
-        for note_text in SAMPLE_NOTES:
-            await mem.note(note_text)
-        print(f"  ✅ note()  — {len(SAMPLE_NOTES)} notes recorded")
-
-        # ── 2. dream() ──────────────────────────────────────────────
-        memos = await mem.dream()
-        print(f"  ✅ dream() — {len(memos)} memo(s):")
-        for m in memos:
-            print(f"       · {m.content}")
-
-        # ── 3. recall() ─────────────────────────────────────────────
-        results = await mem.recall("coffee preference", n=2)
-        print(f"  ✅ recall('coffee preference') — {len(results)} result(s):")
-        for r in results:
-            print(f"       · {r.content}")
-
-        # ── 4. memos() ─────────────────────────────────────────────
-        all_memos = await mem.memos()
-        print(f"  ✅ memos() — {len(all_memos)} total")
-
-        # ── cleanup ─────────────────────────────────────────────────
-        await mem.forget()
-
-    except Exception as e:
-        print(f"  ❌ Runtime error: {e}")
-
-
-async def main():
-    print("Seeka Quickstart — Storage Backend Comparison")
-    print(f"Platform : {os.name}")
-    print(f"Backends : {[b.value for b in StorageBackend]}")
-    print(f"Data dir : {BASE_DIR}")
-
-    for backend in StorageBackend:
-        await run_backend(backend)
-
-    print(f"\n{'─' * 58}")
-    print("  Done.  ✅ = passed   ⚠️ = platform-unsupported (expected)")
-    print(f"{'─' * 58}")
+    await mem.forget()
+    print("\nDone.")
 
 
 if __name__ == "__main__":
